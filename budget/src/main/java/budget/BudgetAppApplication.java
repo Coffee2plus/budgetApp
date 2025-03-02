@@ -1,4 +1,4 @@
-package com.example.budget;
+package budget;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -7,7 +7,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class BudgetAppApplication {
 
 	public static void main(String[] args) {
+
 		SpringApplication.run(BudgetAppApplication.class, args);
+
 	}
 
 }
