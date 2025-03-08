@@ -3,6 +3,8 @@ package budget;
 //import org.springframework.web.bind.annotation.*;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.IanaLinkRelations;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,9 +25,11 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 public class BudgetController {
 
     private final BudgetRepository repository;
+    private final BudgetModelAssembler assembler;
 
-    BudgetController(BudgetRepository repository) {
+    BudgetController(BudgetRepository repository, BudgetModelAssembler assembler) {
         this.repository = repository;
+        this.assembler = assembler;
     }
 
 //    Aggregate root
@@ -33,10 +37,8 @@ public class BudgetController {
     @GetMapping("/budgets")
     CollectionModel<EntityModel<Budget>> all() {
         List<EntityModel<Budget>> budgets = repository.findAll().stream()
-                .map(budget -> EntityModel.of(budget,
-                        linkTo(methodOn(BudgetController.class).one(budget.getId())).withSelfRel(),
-                        linkTo(methodOn(BudgetController.class).all()).withRel("budgets")))
-                                .collect(Collectors.toList());
+                .map(assembler::toModel)
+                .collect(Collectors.toList());
         return CollectionModel.of(budgets, linkTo(methodOn(BudgetController.class).all()).withSelfRel());
     }
 //    end::get-aggregate-root[]
@@ -54,15 +56,13 @@ public class BudgetController {
         Budget budget = repository.findById(id)
                 .orElseThrow(() -> new BudgetNotFoundException(id));
 
-        return EntityModel.of(budget,
-                linkTo(methodOn(BudgetController.class).one(id)).withSelfRel(),
-                linkTo(methodOn(BudgetController.class).all()).withRel("budgets"));
+        return assembler.toModel(budget);
     }
 
     @PutMapping("/budgets/{id}")
-    Budget replaceBudget(@RequestBody Budget newBudget, @PathVariable Long id){
+    ResponseEntity<?> replaceBudget(@RequestBody Budget newBudget, @PathVariable Long id){
 
-        return repository.findById(id)
+        Budget updatedBudget =  repository.findById(id)
                 .map(budget -> {
                     budget.setDate(newBudget.getDate());
                     budget.setSubject(newBudget.getSubject());
@@ -76,10 +76,16 @@ public class BudgetController {
                 .orElseGet(() -> {
                     return repository.save(newBudget);
                 });
+        EntityModel<Budget> entityModel = assembler.toModel(updatedBudget);
+        
+        return ResponseEntity
+                .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri())
+                .body(entityModel);
     }
 
     @DeleteMapping("/budgets/{id}")
-    void deleteBudget(@PathVariable Long id) {
+    ResponseEntity<?> deleteBudget(@PathVariable Long id) {
         repository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }
